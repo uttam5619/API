@@ -27,7 +27,7 @@ This command initialize the typescript config file like shown below.
   }
 }
 
-# Setting up the database and sequlite ORM.
+# Setting up the database and sequelize ORM.
 
 1. Setting up the configration for the database.
 
@@ -157,9 +157,9 @@ export default sequelize;
 
 ```
 Here the `Sequelize` imported from `sequelize-typescript` is nothing but the class which has methods predefined implementation for following methods
--> .authenticate()
--> .sync()
--> .query()
--> .transaction()
+- .authenticate()
+- .sync()
+- .query()
+- .transaction()
 
 And when we talk about the `sequelize`, this is nothing but the instance of the `Sequelize` class, which gets defined as following `const sequelize = new Sequelize(...)`
