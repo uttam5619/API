@@ -1,5 +1,13 @@
 # Setting up a typescript project.
 ```
+npm i ts-node
+```
+
+```
+npm i tsx
+```
+
+```
 npm i typescript
 ```
 
@@ -73,6 +81,85 @@ Foolowing are the use cases of a database driver:
 5. Vendor-Specific Optimizations
 `Many drivers add features like bulk inserts, streaming results, or database-specific extensions while still providing a standard interface.`
 
-# npm i sequlize-cli
+```
+npm i sequlize-cli
+```
 The command `npm i sequelize-cli` enables us to intract with the database using the command line interface.
 
+
+
+## Configration used by `sequeize-cli`
+```
+module.exports={
+    "development": {
+      "username": process.env.DB_USER,
+      "password": process.env.DB_PASSWORD,
+      "database": process.env.DB_NAME,
+      "host": process.env.DB_HOST,
+      "dialect": "mysql"
+    },
+    "test": {
+      "username": "root",
+      "password": null,
+      "database": "database_test",
+      "host": "127.0.0.1",
+      "dialect": "mysql"
+    },
+    "production": {
+      "username": "root",
+      "password": null,
+      "database": "database_production",
+      "host": "127.0.0.1",
+      "dialect": "mysql"
+    }
+}
+```
+
+## Whenever we run a CLI command like `npx sequelize-cli db:migrate`, internally sequelize does following
+1. Detect environment by checking `process.env.NODE_ENV`, If not set then by defaults it takes it as 11 `development`
+
+2. Picks one of the config block defined as development/test/production from the config file, whose path/location is defined as `config: path.resolve('src/config/db.config.cjs')` in the `.sequelizerc` file.
+Ex-
+```
+module.exports = {
+  development: { ... },
+  test: { ... },
+  production: { ... }
+}
+```
+if sequelize finds the `process.env.NODE_ENV` as `development` then it will pick the following block.
+```
+"development": {
+      "username": process.env.PRODUCTION_USERNAME,
+      "password": process.env.PRODUCTION_PASSWORD,
+      "database": process.env.PRODUCTION_DATABASE,
+      "host": process.env.PRODUCTION_HOST,
+      "dialect": "mysql"
+    }
+```
+
+
+## But during the Run time, for performing the intractions between the application server and database the sequelize uses a completely different configration, which is as following 
+
+```
+import { Sequelize } from "sequelize-typescript"
+
+const sequelize = new Sequelize({
+  database: process.env.DB_NAME!,
+  username: process.env.DB_USER!,
+  password: process.env.DB_PASSWORD!,
+  host: process.env.DB_HOST!,
+  dialect: "mysql",
+  logging: false
+});
+
+export default sequelize;
+
+```
+Here the `Sequelize` imported from `sequelize-typescript` is nothing but the class which has methods predefined implementation for following methods
+->.authenticate()
+->.sync()
+->.query()
+->.transaction()
+
+And when we talk about the `sequelize`, this is nothing but the instance of the `Sequelize` class, which gets defined as following `const sequelize = new Sequelize(...)`
