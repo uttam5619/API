@@ -26,7 +26,7 @@ This command initialize the typescript config file like shown below.
 The db folder contains the models, migrations and seeders. for this pupose  '.sequerizerc' file is used.
 This .sequelizerc file  is a special configuration file used by the Sequelize Command-Line Interface (CLI) to specify options and paths for managing a project's database interactions, such as migrations, models, and seeders.
 
-# The '.sequelizerc' file will contain following type of code.
+1. The '.sequelizerc' file will contain following type of code.
 
 ```
 const path = require('path');
@@ -75,3 +75,4 @@ Foolowing are the use cases of a database driver:
 
 # npm i sequlize-cli
 The command `npm i sequelize-cli` enables us to intract with the database using the command line interface.
+
