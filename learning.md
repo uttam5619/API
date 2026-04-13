@@ -156,10 +156,317 @@ const sequelize = new Sequelize({
 export default sequelize;
 
 ```
-Here the `Sequelize` imported from `sequelize-typescript` is nothing but the class which has methods predefined implementation for following methods
+Here the `Sequelize` imported from `sequelize-typescript` is nothing but the class which has predefined methods and their implementations. It provides methods like
 - .authenticate()
 - .sync()
 - .query()
 - .transaction()
 
 And when we talk about the `sequelize`, this is nothing but the instance of the `Sequelize` class, which gets defined as following `const sequelize = new Sequelize(...)`
+
+
+## Migrations, Models and Seeders
+
+## Migrations
+- A migration is a way to manage and track changes to your database schema over time. It keep track of all the changes done to the database schema, just like a version control but only for the database.
+
+- Instead of directly modifying database tables manually, we Write changes in the migration files and then run migrations to apply those changes to the database schema, so that the database schema remains in the sync with the application.
+
+- a migration file has following two functions that is `up()` and `down()`
+- up() -> It is used to apply the changes.
+- down() -> It is used to revert the specific changes that we have made for the migration.
+- A migration file contains following type of code.
+
+```
+module.exports= {
+  async up (queryInterface, Sequelize) {
+    await queryInterface.createTable('Theatre', {
+      id: {
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+        type:'INTEGER'
+      },
+      name: {
+        type: 'VARCHAR(255)',
+        allowNull: false
+      },
+      address: {
+        type: 'VARCHAR(255)',
+        allowNull: false
+      },
+      rating: {
+        type: 'FLOAT',
+        allowNull: false
+      },
+      createdAt: {
+        allowNull: false,
+        type: 'DATE'
+      },
+      updatedAt: {
+        allowNull: false,
+        type: 'DATE'
+      }                                          
+    })
+  },
+
+  async down (queryInterface, Sequelize) {
+    await queryInterface.sequelize.query(`
+      DROP TABLE IF EXISTS  Theatre
+    `)
+  }
+};
+```
+
+## queryInterface.sequelize.query() vs queryInterface methods
+
+`queryInterface` 
+A queryInterface works directly on the schema existing in the db, no model is needed at all when intracting with db using `queryInterface`.
+
+1. `queryInterface.sequelize.query()`
+queryInterfacesequelize.query() lets you run raw SQL queries directly.
+```
+await queryInterface.sequelize.query(
+  "SELECT * FROM Users WHERE age > 25"
+);
+```
+
+2. `queryInterface methods`
+It is a high-level abstraction provided by Sequelize to modify the database schema.
+```
+async up(queryInterface, Sequelize) {
+  await queryInterface.addColumn('Users', 'age', {
+    type: Sequelize.INTEGER,
+  });
+}
+```
+
+A `queryInterface` provides following methods to perform schema level db operations.
+- `createTable()`
+```
+await queryInterface.createTable('Users', {
+  id: {
+    type: Sequelize.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  name: Sequelize.STRING,
+  createdAt: Sequelize.DATE,
+  updatedAt: Sequelize.DATE
+});
+```
+- `dropTable()`
+```
+await queryInterface.dropTable('Users');
+```
+
+- `renameTable()`
+```
+await queryInterface.renameTable('OldName', 'NewName');
+```
+
+- `addColumn()`
+```
+await queryInterface.addColumn('Users', 'email', {
+  type: Sequelize.STRING
+});
+```
+
+-`removeColumn()`
+```
+await queryInterface.removeColumn('Users', 'email');
+```
+
+- `changeColumn()`
+```
+await queryInterface.changeColumn('Users', 'name', {
+  type: Sequelize.STRING,
+  allowNull: false
+});
+```
+
+- `renameColumn()`
+```
+await queryInterface.renameColumn('Users', 'name', 'fullName');
+```
+
+- `addIndex()`
+```
+await queryInterface.addIndex('Users', ['email']);
+```
+
+- `removeIndex()`
+```
+await queryInterface.removeIndex('Users', ['email']);
+```
+
+-`addConstraint()`
+```
+await queryInterface.addConstraint('Orders', {
+  fields: ['userId'],
+  type: 'foreign key',
+  name: 'fk_user_order',
+  references: {
+    table: 'Users',
+    field: 'id'
+  },
+  onDelete: 'CASCADE'
+});
+```
+
+-`removeConstraint()`
+```
+await queryInterface.removeConstraint('Orders', 'fk_user_order');
+```
+
+-`bulkInsert()`
+```
+await queryInterface.bulkInsert('Users', [
+  { name: 'John', createdAt: new Date(), updatedAt: new Date() }
+]);
+```
+-`bulkDelete()`
+```
+await queryInterface.bulkDelete('Users', null, {});
+```
+
+-`bulkUpdate()`
+```
+await queryInterface.bulkUpdate('Users', { name: 'Updated' }, {});
+```
+
+
+## Models
+- A model represents a table in your database. It acts like a blueprint.
+- `A model is used to deal with the data associated with the table, unlike queryInterface which was getting used to deal with the schema of the database not the data`.
+- A model is mainly used for performing the CRUD operations over the data associated with the Table.
+- A model contains following type of code.
+```
+import { DataTypes } from "sequelize";
+import sequelize from "../config/db";
+
+const User = sequelize.define("Users", {
+  name: DataTypes.STRING,
+  email: DataTypes.STRING
+});
+
+export default User;
+```
+This `User` will get used to perform the operations on the data associated with the User Table.
+
+- create Data
+```
+await User.create({ 
+  name: "Uttam",
+  email: "uttam@gmail.com"
+});
+```
+
+- read Data
+```
+const users = await User.findAll()
+```
+
+- updateData
+```
+await User.update(
+  { name: "New Name" },
+  { where: { id: 1 } }
+);
+```
+
+- delete data
+```
+await User.destroy(
+  { 
+    where: { id: 1 } 
+  }
+);
+```
+
+## Seeders
+Seeders are the data initially populated in the database.
+
+## Migrations vs Models
+A migration is used for making schema level changes.
+A model is used for following purposes mentioned below
+
+- Validation of the data.
+```
+email: {
+  type: DataTypes.STRING,
+  validate: { isEmail: true }
+}
+```
+- Though the Sequelize handles the `relationship/association` defined by `joins` automatically but we can explicitely handle the associations/relationship
+
+```
+User.hasMany(Post);
+Post.belongsTo(User);
+```
+
+- To deal with the triggers, it is the `model` which provide the hooks.
+```
+User.beforeCreate(user => {
+  user.name = user.name.toUpperCase();
+});
+```
+  
+
+## Commands used by sequelize-cli
+
+1. `Command to create following folders`
+- models
+- migrations
+- seeders
+- config
+
+```
+npx sequelize-cli init
+```
+
+2. `Command to create only the models folder`
+```
+npx sequelize-cli init:models
+```
+
+3. `Command to create only the migrations folder`
+```
+npx sequelize-cli init:migrations
+```
+
+4. `Command to create only the seeders folder`
+```
+npx sequelize-cli init:seeders
+```
+
+5. `Command to generate the model along with migration`
+```
+npx sequelize-cli model:generate --name User --attributes name:string,email:string
+```
+
+6. `Command to Generate only migration`
+```
+npx sequelize-cli migration:generate --name create-users-table
+```
+
+7. `Command to run all migrations`
+```
+npx sequelize-cli db:migrate
+```
+
+8. `Command to undo the last migration`
+```
+npx sequelize-cli db:migrate:undo
+```
+
+9. `Commandd to undo all the migrations`
+```
+npx sequelize-cli db:migrate:undo:all
+```
+
+10. `Command to check the migration status`
+```
+npx sequelize-cli db:migrate:status
+```
+
