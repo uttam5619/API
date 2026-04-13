@@ -34,7 +34,7 @@ This command initialize the typescript config file like shown below.
 The db folder contains the models, migrations and seeders. for this pupose  '.sequerizerc' file is used.
 This .sequelizerc file  is a special configuration file used by the Sequelize Command-Line Interface (CLI) to specify options and paths for managing a project's database interactions, such as migrations, models, and seeders.
 
-1. The '.sequelizerc' file will contain following type of code.
+2. The '.sequelizerc' file will contain following type of code.
 
 ```
 const path = require('path');
@@ -46,7 +46,7 @@ module.exports = {
 };
 ```
 
-2. Installing dependencies
+3. Installing dependencies
 
 ```
 npm i sequelize
@@ -61,7 +61,7 @@ The command `npm install mysql2` helps to install the database specific driver l
 The primary purpose of a database driver library is to enable your application to communicate with the database in a standardized, efficient, and secure way.
 
 # Key Functions of the driver library.
-Foolowing are the use cases of a database driver:
+Following are the use cases of a database driver:
 
 1. Establishing and Managing Connections`
 `Handles connection strings, authentication (username/password, SSL, tokens), and pooling (reusing connections for performance)`.
@@ -157,9 +157,9 @@ export default sequelize;
 
 ```
 Here the `Sequelize` imported from `sequelize-typescript` is nothing but the class which has methods predefined implementation for following methods
-->.authenticate()
-->.sync()
-->.query()
-->.transaction()
+-> .authenticate()
+-> .sync()
+-> .query()
+-> .transaction()
 
 And when we talk about the `sequelize`, this is nothing but the instance of the `Sequelize` class, which gets defined as following `const sequelize = new Sequelize(...)`
