@@ -300,7 +300,7 @@ await queryInterface.addIndex('Users', ['email']);
 await queryInterface.removeIndex('Users', ['email']);
 ```
 
--`addConstraint()`
+- `addConstraint()`
 ```
 await queryInterface.addConstraint('Orders', {
   fields: ['userId'],
@@ -314,23 +314,23 @@ await queryInterface.addConstraint('Orders', {
 });
 ```
 
--`removeConstraint()`
+- `removeConstraint()`
 ```
 await queryInterface.removeConstraint('Orders', 'fk_user_order');
 ```
 
--`bulkInsert()`
+- `bulkInsert()`
 ```
 await queryInterface.bulkInsert('Users', [
   { name: 'John', createdAt: new Date(), updatedAt: new Date() }
 ]);
 ```
--`bulkDelete()`
+- `bulkDelete()`
 ```
 await queryInterface.bulkDelete('Users', null, {});
 ```
 
--`bulkUpdate()`
+- `bulkUpdate()`
 ```
 await queryInterface.bulkUpdate('Users', { name: 'Updated' }, {});
 ```
@@ -352,7 +352,7 @@ const User = sequelize.define("Users", {
 
 export default User;
 ```
-This `User` will get used to perform the operations on the data associated with the User Table.
+This `User` model will get used to perform the operations on the data associated with the User Table.
 
 - create Data
 ```
@@ -460,7 +460,7 @@ npx sequelize-cli db:migrate
 npx sequelize-cli db:migrate:undo
 ```
 
-9. `Commandd to undo all the migrations`
+9. `Command to undo all the migrations`
 ```
 npx sequelize-cli db:migrate:undo:all
 ```
@@ -469,4 +469,3 @@ npx sequelize-cli db:migrate:undo:all
 ```
 npx sequelize-cli db:migrate:status
 ```
-
