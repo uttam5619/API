@@ -16,15 +16,16 @@ export async function IdempotentRequest(req:Request, res:Response, next:NextFunc
 
         if(!idempotent_key){
 
-            const key = GenerateIdempotentKey()
+            const newkey = GenerateIdempotentKey()
             const request_hash = GenerateRequestHash(user_id,email)
             
             const idempotentRecordObject={
-                idempotent_key:key,
+                idempotent_key:newkey,
                 user_id:user_id,
                 request_method:request_method,
                 endpoint:request_url,
-                request_hash:request_hash
+                request_hash:request_hash,
+                status:'processing'
             }
 
             //Generating the idempotent_key_record.
@@ -37,8 +38,8 @@ export async function IdempotentRequest(req:Request, res:Response, next:NextFunc
             //Sending the idempotent_key back to the client.
             res.setHeader("idempotent-key", key_saved);
             //Embedding the idempotent_key in the request body so that it can be used further.
-            //(req as any).idempotent_key = key_saved;
-
+            (req as any).idempotent_key = key_saved;
+            
         }else{
             
             // If the key is already generated and exisiting in the req body
@@ -54,8 +55,9 @@ export async function IdempotentRequest(req:Request, res:Response, next:NextFunc
                 throw new ResourceNotFoundError(400,'Idempotent key not found')
             }
 
-            const request_hash = GenerateRequestHash(user_id, email )
-            if(request_hash!=key_record.get("request_hash") as string){
+            const current_hash = GenerateRequestHash(user_id, email )
+            const stored_hash = key_record.get("request_hash") as string
+            if(current_hash != stored_hash){
                 return res.status(409).json(
                     {
                         sucess:false,
@@ -75,7 +77,6 @@ export async function IdempotentRequest(req:Request, res:Response, next:NextFunc
 
         }
 
-        next()
     }catch(err){
         console.log(err)
     }
@@ -88,7 +89,7 @@ export function IdempotentResponse(req: Request, res: Response, next: NextFuncti
   const originalJson = res.json;
 
   res.json = function (body: any) {
-    const key = res.headers["idempotent-key"] as string;
+    const key = req.headers["idempotent-key"] as string;
 
     //determining status based on response body
     let status: string;
