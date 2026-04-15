@@ -2,129 +2,109 @@ import { Idempotent_key } from "../db/models/idempotent_key.model.js";
 import type { Request,Response, NextFunction } from "express";
 import { GenerateIdempotentKey } from "../utils/GenerateIdempotentKey.js";
 import { GenerateRequestHash } from "../utils/crypto.js";
-import { GenericError, ResourceNotFoundError, ServerError } from "../utils/Error.js";
 
-export async function IdempotentRequest(req:Request, res:Response, next:NextFunction){
+export async function IdempotentRequestMiddleware(req: Request, res: Response, next: NextFunction) {
 
-    try{
-        // generating the key for the very first time.
+    const key = req.headers["idempotency-key"] as string;
+    const email = req.body.email
+     
+    //checking the key.
+    if (!key) {
+        return res.status(400).json({ message: "Idempotency-Key header is required" });
+    }
 
-        const idempotent_key = req.headers["idempotent-key"]
-        const {user_id,email} = req.body
-        const request_url = req.originalUrl
-        const request_method = req.method
-
-        if(!idempotent_key){
-
-            const newkey = GenerateIdempotentKey()
-            const request_hash = GenerateRequestHash(user_id,email)
-            
-            const idempotentRecordObject={
-                idempotent_key:newkey,
-                user_id:user_id,
-                request_method:request_method,
-                endpoint:request_url,
-                request_hash:request_hash,
-                status:'processing'
+    try {
+        const requestHash = GenerateRequestHash(req.body);
+        
+        // Atomic check or insert
+        // Using a unique constraint in DB to prevent race conditions
+        const [record, created] = await Idempotent_key.findOrCreate({
+            where: { idempotent_key: key },
+            defaults: {
+                status: 'processing',
+                request_hash: requestHash,
+                endpoint: req.originalUrl
             }
+        });
 
-            //Generating the idempotent_key_record.
-            const key_record = await Idempotent_key.create(idempotentRecordObject)
-            if(!key_record){
-                throw new ServerError(500,'failed to generate the idempotent key')
-            }
-            //Extracting the idempotent_key from the idempotent_key_record. 
-            const key_saved= key_record.get("idempotent_key") as string
-            //Sending the idempotent_key back to the client.
-            res.setHeader("idempotent-key", key_saved);
-            //Embedding the idempotent_key in the request body so that it can be used further.
-            (req as any).idempotent_key = key_saved;
-            
-        }else{
-            
-            // If the key is already generated and exisiting in the req body
+        if (!created) {
+          //Integrity Check to find did the payload change?
+          if (record.request_hash !== requestHash) {
+              return res.status(400).json({ 
+                  error: "Idempotency-Error",
+                  message: "Idempotency key reused with a different request body." 
+              });
+          }
+      
+          //Concurrency Check to find that is the request still running.
+          if (record.status === 'processing') {
+              const lockDuration = Date.now() - new Date(record.createdAt).getTime();
+              
+              //Zombie Check that whether it been "processing" for too long
+              if (lockDuration > 120000) { 
+                  // if processing foor more than 2 minutes then clear the zombie and let this request create a new one
+                  await record.destroy();
+                  return res.status(503).json({ message: "Previous attempt timed out. Please retry." });
+              }
+              // Tell client to wait 2 seconds
+              res.set("Retry-After", "2");
+              return res.status(409).json({ message: "Request is currently being processed." });
+          }
+      
+          // Final Replay: Use the stored status and data
+          // Ensure you fall back to 200 if response_status wasn't saved
+          const savedStatus = record.response_status || 200;
+          
+          // Add a custom header so the client knows this is a "Replayed" response
+          res.set("Idempotency-Replayed", "true");
+          
+          return res.status(savedStatus).json(record.response_data);
+      }
 
-            const key_record = await Idempotent_key.findOne({
-                where: {
-                  idempotent_key,
-                  request_method: request_method,
-                  endpoint: request_url
-                }
-            })
-            if(!key_record){
-                throw new ResourceNotFoundError(400,'Idempotent key not found')
-            }
+      // Attach key to req so the controller can update the record later
+      (req as any).idempotencyKey = key;
+        
+      //Proceed to the actual logic
+      next();
 
-            const current_hash = GenerateRequestHash(user_id, email )
-            const stored_hash = key_record.get("request_hash") as string
-            if(current_hash != stored_hash){
-                return res.status(409).json(
-                    {
-                        sucess:false,
-                        messagge: "Idempotency key reused with different payload"
-                    }
-                );
-            }
-
-            const responseData = key_record.get("response_data")
-            return res.status(200).json(
-                {
-                    sucess:true,
-                    message:'',
-                    data:responseData
-                }
-            )
-
-        }
-
-    }catch(err){
-        console.log(err)
+    } catch (err) {
+        console.error(err);
+        next(err)
     }
 }
 
 
+export function IdempotentResponseMiddleware(req: Request, res: Response, next: NextFunction) {
+  const key = req.headers["idempotency-key"] as string;
 
+  // If no key, don't bother patching
+  if (!key) return next();
 
-export function IdempotentResponse(req: Request, res: Response, next: NextFunction) {
   const originalJson = res.json;
 
   res.json = function (body: any) {
-    const key = req.headers["idempotent-key"] as string;
+    // Capture the actual HTTP status code
+    const statusCode = res.statusCode;
+    
+    // Logic to determine if this should be cached
+    // Usually, we don't cache 5xx errors so the user can actually retry
+    const isCacheable = statusCode < 500;
 
-    //determining status based on response body
-    let status: string;
-    let response_data: any;
-
-    if (body?.success) {
-      status = "completed";
-      response_data = body.data;
+    if (isCacheable) {
+      // Background update (or await if high-consistency is needed)
+      Idempotent_key.update(
+        {
+          status: "completed",
+          response_code: statusCode, // Save the status!
+          response_data: body,       // Save the full body
+        },
+        { where: { idempotent_key: key } }
+      ).catch(err => console.error("Idempotency update failed:", err));
     } else {
-      status = "rejected";
-      response_data = {
-        message: body?.message || "The request has been denied",
-      };
+        // If it's a 500, maybe delete the key so they can try again immediately?
+        Idempotent_key.destroy({ where: { idempotent_key: key } }).catch(() => {});
     }
 
-    // not blocking the response
-    setImmediate(async () => {
-      try {
-        if (!key) return;
-
-        await Idempotent_key.update(
-          {
-            status,
-            response_data,
-          },
-          {
-            where: { idempotent_key: key },
-          }
-        );
-      } catch (err) {
-        console.error("Idempotent update failed:", err);
-      }
-    });
-
-    //send response immediately
     return originalJson.call(this, body);
   };
 

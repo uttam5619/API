@@ -1,6 +1,7 @@
 import sequelize from "../../config/db.js";
 import { Sequelize, DataTypes } from "sequelize";
 
+
 export const Idempotent_key = sequelize.define(
     'Idempotent_key',
     {

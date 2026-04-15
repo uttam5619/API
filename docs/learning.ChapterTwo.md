@@ -101,7 +101,7 @@ export async function IdempotentRequest(req:Request, res:Response, next:NextFunc
             )
 
         }
-
+        next()
     }catch(err){
         console.log(err)
     }
@@ -114,9 +114,6 @@ The code generates a key if one isn't provided. This defeats the purpose of idem
 
 - `Race Conditions (Concurrency)`
 If two identical requests hit the server at the exact same millisecond, both might find that no record exists (or that the status is 'processing') and both will proceed to execute the business logic (e.g., charging a credit card).
-
-- `The Middleware "Next" Problem`
-The Problem: In the `if(!idempotent_key)` block, you create the record and set headers, but you never call `next()`.
 
 - `Handling "Processing" State`
 The Problem: If a second request arrives while the first one is still status: 'processing', your code currently proceeds to try and return responseData. However, responseData will be null because the first request hasn't finished.
