@@ -23,7 +23,8 @@ export async function IdempotentRequestMiddleware(req: Request, res: Response, n
             defaults: {
                 status: 'processing',
                 request_hash: requestHash,
-                endpoint: req.originalUrl
+                endpoint: req.originalUrl,
+                request_method:req.method
             }
         });
 

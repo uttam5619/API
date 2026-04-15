@@ -35,8 +35,18 @@ export const User = sequelize.define(
         },
         is_deleted:{
             type: DataTypes.DATE
+        },
+        created_at:{
+            type:DataTypes.DATE
+        },
+        updated_at:{
+            type:DataTypes.DATE
         }
 
     },
-    {timestamps:true}
+    {
+        timestamps:true,
+        createdAt: "created_at",
+        updatedAt: "updated_at"
+    }
 )

@@ -12,6 +12,7 @@ export async function SignUpRepository(data:any){
 
     const user={
         id: userData.id,
+        name: userData.name,
         email: userData.email,
         role: userData.role,
         is_verified: userData.is_verified

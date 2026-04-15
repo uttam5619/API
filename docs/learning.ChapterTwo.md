@@ -117,3 +117,159 @@ If two identical requests hit the server at the exact same millisecond, both mig
 
 - `Handling "Processing" State`
 The Problem: If a second request arrives while the first one is still status: 'processing', your code currently proceeds to try and return responseData. However, responseData will be null because the first request hasn't finished.
+
+
+## Creating the idempotent key
+For the incoming request the flow of data is like `routes-> middleware -> controller -> service layer -> repository layer`
+- For the incoming data we will create an idempotent_key record in the idempotency_key table.
+```
+
+export async function IdempotentRequestMiddleware(req: Request, res: Response, next: NextFunction) {
+
+    const key = req.headers["idempotency-key"] as string;
+    const email = req.body.email
+     
+    //checking the key.
+    if (!key) {
+        return res.status(400).json({ message: "Idempotency-Key header is required" });
+    }
+
+    try {
+        const requestHash = GenerateRequestHash(req.body);
+        
+        // Atomic check or insert
+        // Using a unique constraint in DB to prevent race conditions
+        const [record, created] = await Idempotent_key.findOrCreate({
+            where: { idempotent_key: key },
+            defaults: {
+                status: 'processing',
+                request_hash: requestHash,
+                endpoint: req.originalUrl,
+                request_method:req.method
+            }
+        });
+
+        if (!created) {
+          //Integrity Check to find did the payload change?
+          if (record.request_hash !== requestHash) {
+              return res.status(400).json({ 
+                  error: "Idempotency-Error",
+                  message: "Idempotency key reused with a different request body." 
+              });
+          }
+      
+          //Concurrency Check to find that is the request still running.
+          if (record.status === 'processing') {
+              const lockDuration = Date.now() - new Date(record.createdAt).getTime();
+              
+              //Zombie Check that whether it been "processing" for too long
+              if (lockDuration > 120000) { 
+                  // if processing foor more than 2 minutes then clear the zombie and let this request create a new one
+                  await record.destroy();
+                  return res.status(503).json({ message: "Previous attempt timed out. Please retry." });
+              }
+              // Tell client to wait 2 seconds
+              res.set("Retry-After", "2");
+              return res.status(409).json({ message: "Request is currently being processed." });
+          }
+      
+          // Final Replay: Use the stored status and data
+          // Ensure you fall back to 200 if response_status wasn't saved
+          const savedStatus = record.response_status || 200;
+          
+          // Add a custom header so the client knows this is a "Replayed" response
+          res.set("Idempotency-Replayed", "true");
+          
+          return res.status(savedStatus).json(record.response_data);
+      }
+
+      // Attach key to req so the controller can update the record later
+      (req as any).idempotencyKey = key;
+        
+      //Proceed to the actual logic
+      next();
+
+    } catch (err) {
+        console.error(err);
+        next(err)
+    }
+}
+```
+
+- Now after creating the idempotent record with the given idempotent key, we will perform the business logic in the service layer and repository layer and when we will be ready to return the responce then just before returning the response we will use a `middleware` to catch the respose and make final changes in the `idempotent_key table` for the response we are supposed to send back to the client.
+
+- this is the code of the middleware
+```
+
+export async function IdempotentRequestMiddleware(req: Request, res: Response, next: NextFunction) {
+
+    const key = req.headers["idempotency-key"] as string;
+    const email = req.body.email
+     
+    //checking the key.
+    if (!key) {
+        return res.status(400).json({ message: "Idempotency-Key header is required" });
+    }
+
+    try {
+        const requestHash = GenerateRequestHash(req.body);
+        
+        // Atomic check or insert
+        // Using a unique constraint in DB to prevent race conditions
+        const [record, created] = await Idempotent_key.findOrCreate({
+            where: { idempotent_key: key },
+            defaults: {
+                status: 'processing',
+                request_hash: requestHash,
+                endpoint: req.originalUrl,
+                request_method:req.method
+            }
+        });
+
+        if (!created) {
+          //Integrity Check to find did the payload change?
+          if (record.request_hash !== requestHash) {
+              return res.status(400).json({ 
+                  error: "Idempotency-Error",
+                  message: "Idempotency key reused with a different request body." 
+              });
+          }
+      
+          //Concurrency Check to find that is the request still running.
+          if (record.status === 'processing') {
+              const lockDuration = Date.now() - new Date(record.createdAt).getTime();
+              
+              //Zombie Check that whether it been "processing" for too long
+              if (lockDuration > 120000) { 
+                  // if processing foor more than 2 minutes then clear the zombie and let this request create a new one
+                  await record.destroy();
+                  return res.status(503).json({ message: "Previous attempt timed out. Please retry." });
+              }
+              // Tell client to wait 2 seconds
+              res.set("Retry-After", "2");
+              return res.status(409).json({ message: "Request is currently being processed." });
+          }
+      
+          // Final Replay: Use the stored status and data
+          // Ensure you fall back to 200 if response_status wasn't saved
+          const savedStatus = record.response_status || 200;
+          
+          // Add a custom header so the client knows this is a "Replayed" response
+          res.set("Idempotency-Replayed", "true");
+          
+          return res.status(savedStatus).json(record.response_data);
+      }
+
+      // Attach key to req so the controller can update the record later
+      (req as any).idempotencyKey = key;
+        
+      //Proceed to the actual logic
+      next();
+
+    } catch (err) {
+        console.error(err);
+        next(err)
+    }
+}
+```
+

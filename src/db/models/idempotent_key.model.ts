@@ -27,7 +27,6 @@ export const Idempotent_key = sequelize.define(
         },
         request_hash: {
           type: DataTypes.CHAR(64),
-          allowNull: false
         },
         response_data: {
           type: DataTypes.JSON
@@ -40,5 +39,9 @@ export const Idempotent_key = sequelize.define(
           type: DataTypes.DATE
         }
     },
-    {timestamps:true}
+    {
+      timestamps:true,
+      createdAt: "created_at",
+      updatedAt: "updated_at"
+    }
 )

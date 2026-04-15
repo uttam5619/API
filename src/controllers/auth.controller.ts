@@ -1,11 +1,12 @@
 import type { Request,Response,} from "express";
 import { SignUpService } from "../service/authService.js";
+import { ServerError } from "../utils/Error.js";
 
 
 export async function SignUp(req:Request,res:Response){
     try{
         const data =req.body
-        const newUser = SignUpService(data)
+        const newUser = await SignUpService(data)
         return res.status(201).json(
             {
                 sucess:true,
@@ -21,9 +22,14 @@ export async function SignUp(req:Request,res:Response){
 
 export async function SignIn(req:Request,res:Response){
     try{
-
+        res.status(200).json(
+            {
+                sucess:'true',
+                message:'signup route working properly'
+            }
+        )
     }catch(err){
-        
+        console.log(err)
     }
 }
 

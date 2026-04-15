@@ -3,4 +3,6 @@ import applicationRouter from './routes/application.routes.js'
 
 export const app= express()
 
-app.use('/movix',applicationRouter)
+app.use(express.json())
+
+app.use('/moviex',applicationRouter)
